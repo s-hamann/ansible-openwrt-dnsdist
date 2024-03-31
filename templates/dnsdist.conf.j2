@@ -1,0 +1,196 @@
+#jinja2: lstrip_blocks: True, trim_blocks: True
+{# vim: filetype=lua.jinja2 #}
+{% macro print_value(value) %}
+  {% if value is mapping %}
+{{ '{ ' -}}
+    {% for k, v in value.items() %}
+{{ k }}={{ print_value(v) -}}
+      {% if not loop.last %}, {% endif %}
+    {% endfor %}
+ }{# #}
+  {% elif value is string %}
+"{{ value }}"{# -#}
+  {% elif value is sequence %}
+{{ '{ ' -}}
+    {% for v in value %}
+{{ print_value(v) -}}
+      {% if not loop.last %}, {% endif %}
+    {% endfor %}
+ }{# #}
+  {% elif value is boolean %}
+{{ value | ansible.builtin.ternary('true', 'false') -}}
+  {% elif value == None %}
+nil{# #}
+  {% else %}
+{{ value -}}
+  {% endif %}
+{% endmacro %}
+{% macro print_function(name) %}
+{{ name }}({# #}
+  {% set parameters = [] %}
+  {% for p in varargs | reverse %}
+    {% if p is defined and p != omit and (p is boolean or p is string or p is number or p is ansible.builtin.truthy) %}
+      {% set _ = parameters.insert(0, p) %}
+    {% elif parameters | count > 0 %}
+      {% set _ = parameters.insert(0, None) %}
+    {% endif %}
+  {% endfor %}
+  {% for p in parameters %}
+{{ print_value(p) -}}
+    {% if not loop.last %}
+, {# -#}
+    {% endif %}
+  {% endfor %}
+){# #}
+{% endmacro %}
+{% macro print_rule(rule) %}
+  {% if rule is mapping %}
+    {% set name = rule.keys() | first | ansible.builtin.regex_replace('Rule$', '') ~ 'Rule' %}
+    {% set options = rule.values() | first %}
+    {% if name in ['AndRule', 'OrRule', 'NotRule'] %}
+      {# options are actually rule selectors #}
+      {% set rules = [options] | ansible.builtin.flatten %}
+{{ name }}({# #}
+      {% if rules | count > 1 %}
+{{ '{ ' -}}
+      {% endif %}
+      {% for r in rules %}
+{{ print_rule(r) -}}
+        {% if not loop.last %}
+, {# -#}
+        {% endif %}
+      {% endfor %}
+      {% if rules | count > 1 %}
+ }{# #}
+      {% endif %}
+){# #}
+    {% else %}
+    {# options are regular function options #}
+{{ print_function(name, options) -}}
+    {% endif %}
+  {% else %}
+{{ rule -}}
+  {% endif %}
+{% endmacro %}
+{% macro print_action(action) %}
+  {% set name = action.keys() | first | ansible.builtin.regex_replace('Action$', '') ~ 'Action' %}
+  {% set options = action.values() | first %}
+{{ print_function(name, options) -}}
+{% endmacro %}
+{{ ansible_managed | ansible.builtin.comment(decoration='-- ') }}
+
+{% block console %}
+  {% if [dnsdist_console] | ansible.builtin.flatten | count > 0 %}
+-- Console sockets
+    {% for console in [dnsdist_console] | ansible.builtin.flatten %}
+{{ print_function('controlSocket', console) }}
+    {% endfor %}
+-- Shared secret for console access
+{{ print_function('setKey', dnsdist_console_key) }}
+  {% endif %}
+  {% if dnsdist_console_acl | count > 0 %}
+-- Console socket ACLs
+    {% for subnet in dnsdist_console_acl %}
+{{ print_function('addConsoleACL', subnet) }}
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+
+{% block listen %}
+  {% block listen_do53 %}
+    {% if [dnsdist_listen] | ansible.builtin.flatten | count > 0 %}
+-- Listen sockets for unencrypted DNS (Do53, DoU)
+      {% for listen in [dnsdist_listen] | ansible.builtin.flatten %}
+        {% if listen is mapping %}
+{{ print_function('addLocal', listen['address'], dnsdist_listen_default_options | ansible.builtin.combine(listen['options'] | default({}))) }}
+        {% else %}
+{{ print_function('addLocal', listen, dnsdist_listen_default_options) }}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  {% endblock %}
+  {% block listen_dot %}
+    {% if [dnsdist_listen_dot] | ansible.builtin.flatten | count > 0 %}
+-- Listen sockets for DNS-over-TLS (DoT)
+      {% for listen in [dnsdist_listen_dot] | ansible.builtin.flatten %}
+{{ print_function('addTLSLocal', listen['address'], listen['cert'], listen['key'], dnsdist_listen_dot_default_options | ansible.builtin.combine(listen['options'] | default({}))) }}
+      {% endfor %}
+    {% endif %}
+  {% endblock %}
+  {% block listen_doh %}
+    {% if [dnsdist_listen_doh] | ansible.builtin.flatten | count > 0 %}
+-- Listen sockets for DNS-over-HTTPS (DoH)
+      {% for listen in [dnsdist_listen_doh] | ansible.builtin.flatten %}
+        {% if listen is mapping %}
+{{ print_function('addDOHLocal', listen['address'], listen['cert'], listen['key'], listen['urls'], dnsdist_listen_doh_default_options | ansible.builtin.combine(listen['options'] | default({}))) }}
+        {% else %}
+{{ print_function('addDOHLocal', listen, omit, omit, omit, dnsdist_listen_doh_default_options) }}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  {% endblock %}
+  {% block listen_dnscrypt %}
+    {% if [dnsdist_listen_dnscrypt] | ansible.builtin.flatten | count > 0 %}
+-- Listen sockets for DNSCrypt
+      {% for listen in [dnsdist_listen_dnscrypt] | ansible.builtin.flatten %}
+{{ print_function('addDNSCryptBind', listen['address'], listen['provider'], listen['cert'], listen['key'], dnsdist_listen_dnscrypt_default_options | ansible.builtin.combine(listen['options'] | default({}))) }}
+      {% endfor %}
+    {% endif %}
+  {% endblock %}
+{% endblock %}
+
+{% block acl %}
+  {% if dnsdist_acl | count > 0 %}
+-- Server access ACLs
+    {% for subnet in dnsdist_acl %}
+{{ print_function('addACL', subnet) }}
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+
+{% block server %}
+  {% if [dnsdist_backend] | ansible.builtin.flatten | count > 0 %}
+-- Backend server pools
+    {% for server in [dnsdist_backend] | ansible.builtin.flatten %}
+{{ print_function('newServer', server) }}
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+
+{% block cache %}
+  {% if [dnsdist_cache] | ansible.builtin.flatten | count > 0 %}
+-- Response caches
+    {% for cache in [dnsdist_cache] | ansible.builtin.flatten %}
+      {% set cache_var = 'cache' ~ loop.index %}
+{{ cache_var }} = {{ print_function('newPacketCache', cache['maxEntries'], cache['options']) }}
+      {% for pool in [cache['pool']] | default(['']) | ansible.builtin.flatten %}
+getPool("{{ pool }}"):setCache({{ cache_var }})
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+
+{% block rule %}
+  {% if dnsdist_rule.keys() | count > 0 %}
+-- Rule selectors
+    {% for name, rule in dnsdist_rule.items() %}
+{{ name }} = {{ print_rule(rule) }}
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+{% block action %}
+  {% if [dnsdist_backend] | ansible.builtin.flatten | count > 0 %}
+-- Rule actions
+    {% for ruleaction in [dnsdist_action] | ansible.builtin.flatten %}
+addAction({# #}
+{{ print_rule(ruleaction['rule']) }}, {{ print_action(ruleaction['action']) -}}
+)
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+
+{% block raw %}
+  {% for line in [dnsdist_raw] | ansible.builtin.flatten %}
+{{ line }}
+  {% endfor %}
+{% endblock %}

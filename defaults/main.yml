@@ -1,0 +1,20 @@
+---
+dnsdist_package: dnsdist
+dnsdist_console: []
+dnsdist_console_acl: []
+dnsdist_console_key: "{% set key = [] -%}
+  {% for i in range(32) -%}
+    {% set _ = key.append('%c' % 256 | ansible.builtin.random(seed=i ~ ':' ~ inventory_hostname)) -%}
+  {% endfor -%}
+  {{ ''.join(key) | ansible.builtin.b64encode('iso-8859-1') }}"
+dnsdist_listen: []
+dnsdist_listen_dot: []
+dnsdist_listen_doh: []
+dnsdist_listen_dnscrypt: []
+dnsdist_listen_default_options: {}
+dnsdist_listen_dot_default_options: {}
+dnsdist_listen_doh_default_options: {}
+dnsdist_listen_dnscrypt_default_options: {}
+dnsdist_acl: []
+dnsdist_backend: []
+dnsdist_rule: {}

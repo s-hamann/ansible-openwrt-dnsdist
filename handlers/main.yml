@@ -1,0 +1,6 @@
+---
+- name: 'Restart dnsdist'
+  ansible.builtin.service:
+    name: dnsdist
+    state: "{{ ansible_facts['is_chroot'] | ansible.builtin.ternary(omit, 'restarted') }}"
+  listen: _dnsdist_restart

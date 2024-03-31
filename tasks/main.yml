@@ -1,0 +1,36 @@
+---
+- name: 'Force full dnsdist installation'
+  ansible.builtin.set_fact:
+    dnsdist_package: dnsdist-full
+  when: "dnsdist_listen_dnscrypt | count > 0 or
+        dnsdist_listen_dot | count > 0 or
+        dnsdist_listen_doh | count > 0"
+
+- name: 'Install dnsdist'
+  community.general.opkg:
+    name: "{{ dnsdist_package }}"
+    state: present
+
+- name: 'Configure dnsdist (UCI)'
+  ansible.builtin.copy:
+    dest: '/etc/config/dnsdist'
+    src: 'dnsdist'
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: 'Configure dnsdist'
+  ansible.builtin.template:
+    dest: '/etc/dnsdist.conf'
+    src: 'dnsdist.conf.j2'
+    owner: root
+    group: root
+    mode: '0600'
+    validate: 'dnsdist -C %s --check-config 2>&1'
+  notify: _dnsdist_restart
+
+- name: 'Enable and start dnsdist'
+  ansible.builtin.service:
+    name: dnsdist
+    enabled: true
+    state: "{{ ansible_facts['is_chroot'] | ansible.builtin.ternary(omit, 'started') }}"

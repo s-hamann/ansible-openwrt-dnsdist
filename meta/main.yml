@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  author: 'Sebastian Hamann'
+  description: 'dnsdist setup for OpenWrt'
+
+  license: MIT
+
+  min_ansible_version: '2.10'
+
+  galaxy_tags:
+    - openwrt
+    - dnsdist
+    - nameserver
+    - dns
+    - networking
+
+dependencies: []
