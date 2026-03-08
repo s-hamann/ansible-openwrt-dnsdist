@@ -122,7 +122,7 @@ nil{# #}
 -- Listen sockets for DNS-over-HTTPS (DoH)
       {% for listen in [dnsdist_listen_doh] | ansible.builtin.flatten %}
         {% if listen is mapping %}
-{{ print_function('addDOHLocal', listen['address'], listen['cert'], listen['key'], listen['urls'], dnsdist_listen_doh_default_options | ansible.builtin.combine(listen['options'] | default({}))) }}
+{{ print_function('addDOHLocal', listen['address'], listen['cert'] | default(omit), listen['key'] | default(omit), listen['urls'] | default(omit), dnsdist_listen_doh_default_options | ansible.builtin.combine(listen['options'] | default({}))) }}
         {% else %}
 {{ print_function('addDOHLocal', listen, omit, omit, omit, dnsdist_listen_doh_default_options) }}
         {% endif %}
@@ -162,7 +162,7 @@ nil{# #}
 -- Response caches
     {% for cache in [dnsdist_cache] | ansible.builtin.flatten %}
       {% set cache_var = 'cache' ~ loop.index %}
-{{ cache_var }} = {{ print_function('newPacketCache', cache['maxEntries'], cache['options']) }}
+{{ cache_var }} = {{ print_function('newPacketCache', cache['maxEntries'], cache['options'] | default(omit)) }}
       {% for pool in [cache['pool']] | default(['']) | ansible.builtin.flatten %}
 getPool("{{ pool }}"):setCache({{ cache_var }})
       {% endfor %}
