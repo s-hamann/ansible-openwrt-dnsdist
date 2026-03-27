@@ -6,9 +6,9 @@ This role configures [dnsdist](https://dnsdist.org/) on [OpenWrt](https://www.op
 Requirements
 ------------
 
-This role requires the `ansible.utils` collection and the [netaddr](https://github.com/netaddr/netaddr/) Python package on the Ansible controller.
-
-Moreover, it requires a working [Python](https://www.python.org/) installation on the target system or [gekmihesg's Ansible library for OpenWrt](https://github.com/gekmihesg/ansible-openwrt) on the Ansible controller.
+This role requires the [ansible.utils](https://github.com/ansible-collections/ansible.utils) and the [community.openwrt](https://github.com/ansible-collections/community.openwrt) collection on the Ansible controller.
+As it exclusively uses modules from this collection, Python is *not* required on the target system.
+The [netaddr](https://github.com/netaddr/netaddr/) Python package must be installed on the Ansible controller.
 
 Role Variables
 --------------

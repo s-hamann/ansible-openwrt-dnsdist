@@ -7,12 +7,19 @@
         dnsdist_listen_doh | count > 0"
 
 - name: 'Install dnsdist'
-  community.general.opkg:
+  community.openwrt.apk:
     name: "{{ dnsdist_package }}"
     state: present
+  when: "ansible_facts['pkg_mgr'] == 'apk'"
+
+- name: 'Install dnsdist'
+  community.openwrt.opkg:
+    name: "{{ dnsdist_package }}"
+    state: present
+  when: "ansible_facts['pkg_mgr'] == 'opkg'"
 
 - name: 'Configure dnsdist (UCI)'
-  ansible.builtin.copy:
+  community.openwrt.copy:
     dest: '/etc/config/dnsdist'
     src: 'dnsdist'
     owner: root
@@ -20,7 +27,7 @@
     mode: '0600'
 
 - name: 'Configure dnsdist'
-  ansible.builtin.template:
+  community.openwrt.template:
     dest: '/etc/dnsdist.conf'
     src: 'dnsdist.conf.j2'
     owner: root
@@ -30,7 +37,7 @@
   notify: _dnsdist_restart
 
 - name: 'Enable and start dnsdist'
-  ansible.builtin.service:
+  community.openwrt.service:
     name: dnsdist
     enabled: true
     state: "{{ ansible_facts['is_chroot'] | ansible.builtin.ternary(omit, 'started') }}"
